@@ -1,0 +1,59 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: choice
+        required: true
+        description: Deployment environment
+        options:
+          - /home/dodoafrica/public_html
+          - /home/dodoafrica/staging.dododesign.africa
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      baseDir: ${{ inputs.environment }}
+      newReleaseName: ${{ github.run_id }}
+
+    steps:
+      - name: Set environment variables
+        run: |
+          echo "releasesDir=${{ env.baseDir }}/releases" >> $GITHUB_ENV
+          
+      - name: Set environment variables (Part 2)
+        run: |
+          echo "releasesDir=${{ env.baseDir }}/releases" >> $GITHUB_ENV
+          echo "newReleaseDir=${{ env.releasesDir }}/${{ env.newReleaseName }}" >> $GITHUB_ENV
+          echo "currentDir=${{ env.baseDir }}/current" >> $GITHUB_ENV
+
+      - uses: actions/checkout@v4
+
+      - name: Setup NodeJS
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install and build dependencies
+        run: |
+          npm install
+          npm run build
+
+      - name: Prepare Deployment Directory
+        run: |
+          rm -rf .next/cache
+          rm -rf node_modules
+          rm -rf .git
+          rm -rf .github
+
+      - name: Deploy via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          server-dir: /releases/${{ env.newReleaseName }}/
